@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+
 from textwrap import dedent
 
 # The DAG object; we'll need this to instantiate a DAG
@@ -31,17 +31,40 @@ with DAG(
         bash_command='life_expectancy',
     )
 
-    
-
-
-    task_sex = DummyOperator(task_id='sex')
-    task_country = DummyOperator(task_id='country')
-    task_insurance = DummyOperator(task_id='insurance')
-    task_end = DummyOperator(task_id='end')
-    task_start = DummyOperator(task_id='start')
+    task_sex = DummyOperator(
+            task_id='sex'
+            bash_command="""
+            echo "sex"
+        """
+        )
+    task_country = DummyOperator(
+            task_id='country'
+            bash_command="""
+            echo "country"
+        """
+        )
+    task_insurance = DummyOperator(
+            task_id='insurance'
+            bash_command="""
+            echo "insurance"
+        """
+        )
+    task_end = DummyOperator(
+            task_id='end'
+            bash_command="""
+            echo "end"
+        """
+        )
+    task_start = DummyOperator(
+            task_id='start'
+            bash_command="""
+            echo "start"
+        """
+        )
 
     task_start >> t1
-    t1 >> task_country >>task_end
+    t1 >> task_country >> task_end
     t1 >> task_sex >> task_end
     t1 >> task_insurance >> task_end
 
+    # t1 >> [task_country, task_sex, task_insurance] >> task_end
