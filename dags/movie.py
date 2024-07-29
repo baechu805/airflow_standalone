@@ -53,9 +53,11 @@ with DAG(
          print("::endgroup::")
          return "Whatever you return gets printed in the logs"
 
-    run_this = PythonOperator(
+    run_this = PythonVirtualenvOperator(
         task_id="print_the_context",
         python_callable=print_context
+        requirements=["git+https://github.com/baechu805/movie.git@0.2/api"],
+        system_site_packages=False,
     
     )
     get_data = PythonOperator(
