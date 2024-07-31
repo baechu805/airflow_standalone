@@ -28,7 +28,9 @@ with DAG(
         'retries': 1,
         'retry_delay': timedelta(seconds=3)
     },
-    description='make_parquet',
+    max_active_runs=1,
+    max_active_tasks=3,
+    description='movie',
     schedule_interval="10 4 * * *",
     start_date=datetime(2024, 7, 24),
     catchup=True,
@@ -81,17 +83,17 @@ with DAG(
     get_data = PythonVirtualenvOperator(
         task_id="get.data",
         python_callable=get_data,
-        requirements=["git+https://github.com/baechu805/movie.git@0.3.1/api"],
+        requirements=["git+https://github.com/baechu805/movie.git@0.3/api"],
         system_site_packages=False,
         trigger_rule="all_done",
-        venv_cache_path="/home/joo/tmp2/air_venv/get_data"
+        #venv_cache_path="/home/joo/tmp2/air_venv/get_data"
     )
     save_data = PythonVirtualenvOperator(
         task_id="save.data",
         python_callable=save_data,
         system_site_packages=False,
         trigger_rule="all_done",
-        requirements=["git+https://github.com/baechu805/movie.git@0.3.1/api"],
+        requirements=["git+https://github.com/baechu805/movie.git@0.3/api"],
        #  venv_cache_path="/home/joo/tmp2/air_venv/get_data"
     )
 
@@ -107,6 +109,10 @@ with DAG(
             bash_command="echo 'task'"
     )
 
+    multi_y = EmptyOperator(task_id='multi.y') # 다양성 영화 유무
+    multi_n = EmptyOperator(task_id='multi.n')
+    nation_k  = EmptyOperator(task_id='nation.k')
+    nation_f  = EmptyOperator(task_id='nation.f')
     end = EmptyOperator(task_id='end')
     start = EmptyOperator(task_id='start')
     
@@ -119,9 +125,10 @@ with DAG(
     start >> branch_op
     start >> join_task >> save_data
 
-    branch_op >> rm_dir >> get_data
-    branch_op >> get_data
+    branch_op >> rm_dir >> [get_data, multi_y, multi_n, nation_k, nation_f]  
+    branch_op >> [get_data, multi_y, multi_n, nation_k, nation_f]
     branch_op >> echo_task >> save_data
+    
+    [get_data, multi_y, multi_n, nation_k, nation_f] >> save_data >> end
 
-
-    get_data >> save_data >> end 
+    
