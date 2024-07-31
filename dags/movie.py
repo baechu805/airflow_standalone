@@ -71,7 +71,7 @@ with DAG(
             return "rm.dir"
 
         else:
-            return "get.data","echo.task"
+            return "get.start","echo.task"
 
     branch_op = BranchPythonOperator(
         task_id="branch.op",
@@ -109,26 +109,37 @@ with DAG(
             bash_command="echo 'task'"
     )
 
+    get_start = EmptyOperator(
+            task_id='get.start',
+            trigger_rule="all_done"
+    )
+
+    get_end = EmptyOperator(
+            task_id='get.end',
+            trigger_rule="all_done"
+    )
+
     multi_y = EmptyOperator(task_id='multi.y') # 다양성 영화 유무
     multi_n = EmptyOperator(task_id='multi.n')
     nation_k  = EmptyOperator(task_id='nation.k')
     nation_f  = EmptyOperator(task_id='nation.f')
+
     end = EmptyOperator(task_id='end')
     start = EmptyOperator(task_id='start')
     
-    join_task = BashOperator(
-            task_id='join',
+    throw_err = BashOperator(
+            task_id='throw.err',
             bash_command="exit 1",
             trigger_rule="all_done"
      )
    
     start >> branch_op
-    start >> join_task >> save_data
+    start >> throw_err >> save_data
 
-    branch_op >> rm_dir >> [get_data, multi_y, multi_n, nation_k, nation_f]  
-    branch_op >> [get_data, multi_y, multi_n, nation_k, nation_f]
-    branch_op >> echo_task >> save_data
+    branch_op >> rm_dir >> get_start 
+    branch_op >> get_start
+    branch_op >> echo_task
     
-    [get_data, multi_y, multi_n, nation_k, nation_f] >> save_data >> end
+    get_start >> [get_data, multi_y, multi_n, nation_k, nation_f] >> get_end >> save_data >> end
 
     
