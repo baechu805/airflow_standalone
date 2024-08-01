@@ -86,7 +86,6 @@ with DAG(
             system_site_packages=False,
             trigger_rule="all_done",
             requirements=["git+https://github.com/baechu805/movie.git@0.3/api"],
-       #  venv_cache_path="/home/joo/tmp2/air_venv/get_data"
     )
 
     multi_y = PythonVirtualenvOperator(
@@ -95,10 +94,12 @@ with DAG(
             system_site_packages=False,
             trigger_rule="all_done",
             requirements=["git+https://github.com/baechu805/movie.git@0.3/api"],
-            op_kwargs={"ds_nodash": "{{ ds_nodash }}", "url_param": {"multiMovieYn": "Y"}},
-            #op_args=["{{ ds_nodash }}"],
-            #op_kwargs={"url_param": {"multiMovieYn": "Y"}}
+            op_kwargs={
+                "url_param": {"multiMovieYn": "Y"},
+            }
+
     )
+
 
     multi_n = PythonVirtualenvOperator(
             task_id='multi.n',
@@ -106,20 +107,19 @@ with DAG(
             system_site_packages=False,
             trigger_rule="all_done",
             requirements=["git+https://github.com/baechu805/movie.git@0.3/api"],
-            op_kwargs={"ds_nodash": "{{ ds_nodash }}", "url_param": {"multiMovieYn": "N"}},
-            #op_args=["{{ ds_nodash }}"],
-            #op_kwargs={"url_param": {"multiMovieYn": "N"}}
-    )   
-
+            op_kwargs={
+                "url_param": {"multiMovieYn": "N"}
+            }
+    )
     nation_k  = PythonVirtualenvOperator(
             task_id='nation_k',
             python_callable=common_get_data,
             system_site_packages=False,
             trigger_rule="all_done",
             requirements=["git+https://github.com/baechu805/movie.git@0.3/api"],
-            op_kwargs={"ds_nodash": "{{ ds_nodash }}", "url_param": {"repNationCd": "k"}},
-            #op_args=["{{ ds_nodash }}"],
-            #op_kwargs={"url_param": {"repNationCd": "k"}}
+            op_kwargs={
+                "url_param": {"repNationCd": "K"}
+        }
     )
 
     nation_f  = PythonVirtualenvOperator(
@@ -128,9 +128,9 @@ with DAG(
             system_site_packages=False,
             trigger_rule="all_done",
             requirements=["git+https://github.com/baechu805/movie.git@0.3/api"],
-            op_kwargs={"ds_nodash": "{{ ds_nodash }}", "url_param": {"repNationCd": "f"}},
-            #op_args=["{{ ds_nodash }}"],
-            #op_kwargs={"url_param": {"repNationCd": "F"}}
+            op_kwargs={
+                "url_param": {"repNationCd": "F"}
+        }
     )
 
 
