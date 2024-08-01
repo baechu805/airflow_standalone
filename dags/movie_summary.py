@@ -48,3 +48,7 @@ with DAG(
     summary_df = EmptyOperator(                                                                                        task_id='summary_df',                                                                                      trigger_rule="all_done"
     )
 
+    end = EmptyOperator(task_id='end')
+    start = EmptyOperator(task_id='start')
+
+    start >> apply_type >> merge_df >> de_dup >> summary_df >> end
