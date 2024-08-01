@@ -13,12 +13,6 @@ from airflow.operators.python import (
         BranchPythonOperator
         )
 
-
-def gen_emp(id, rule="all_success"):
-    op = EmptyOperator(task_id=id, trigger_rule=rule)
-    return op
-
-
 with DAG(
     'movie',
     # These args will get passed on to each operator
@@ -34,24 +28,31 @@ with DAG(
     schedule_interval="10 4 * * *",
     start_date=datetime(2024, 7, 24),
     catchup=True,
-    tags=['movie'],
+    tags=['movie', 'api', 'amt'],
 ) as dag:
     
-    # t1, t2 and t3 are examples of tasks created by instantiating operators
-    def get_data(ds_nodash):
+
+    def common_get_data(ds_nodash, url_param):
         from mov.api.call import save2df
-        df=save2df(ds_nodash)
-        print(df.head(5))
+        df = save2df(load_dt=ds_nodash, url_param=url_param)
+
+        print(df[['movieCd', 'movieNm']].head(5)) 
         
-    def print_context(ds=None, **kwargs):
-         pprint(kwargs)
-         print(ds)
-   
+        for key, value in url_param.items():
+            df[key] = value
+
+        p_cols = ['load_dt'] + list(url_param.keys())
+        df.to_parquet('~/tmp/test_parquet',
+                partition_cols=p_cols
+                # partition_cols=['load_dt', 'movieKey']
+        )
+
     def save_data(ds_nodash):
         from mov.api.call import apply_type2df
         
         df = apply_type2df(load_dt=ds_nodash)
         
+        print("*" * 33)
         print(df.head(10))
         print("*" * 33)
         print(df.dtypes)
@@ -74,33 +75,69 @@ with DAG(
             return "get.start","echo.task"
 
     branch_op = BranchPythonOperator(
-        task_id="branch.op",
-        python_callable=branch_fun,
+            task_id="branch.op",
+            python_callable=branch_fun,
 
     )
 
-
-    get_data = PythonVirtualenvOperator(
-        task_id="get.data",
-        python_callable=get_data,
-        requirements=["git+https://github.com/baechu805/movie.git@0.3/api"],
-        system_site_packages=False,
-        trigger_rule="all_done",
-        #venv_cache_path="/home/joo/tmp2/air_venv/get_data"
-    )
     save_data = PythonVirtualenvOperator(
-        task_id="save.data",
-        python_callable=save_data,
-        system_site_packages=False,
-        trigger_rule="all_done",
-        requirements=["git+https://github.com/baechu805/movie.git@0.3/api"],
+            task_id="save.data",
+            python_callable=save_data,
+            system_site_packages=False,
+            trigger_rule="all_done",
+            requirements=["git+https://github.com/baechu805/movie.git@0.3/api"],
        #  venv_cache_path="/home/joo/tmp2/air_venv/get_data"
     )
 
+    multi_y = PythonVirtualenvOperator(
+            task_id='multi.y',
+            python_callable=common_get_data,
+            system_site_packages=False,
+            trigger_rule="all_done",
+            requirements=["git+https://github.com/baechu805/movie.git@0.3/api"],
+            op_kwargs={"ds_nodash": "{{ ds_nodash }}", "url_param": {"multiMovieYn": "Y"}},
+            #op_args=["{{ ds_nodash }}"],
+            #op_kwargs={"url_param": {"multiMovieYn": "Y"}}
+    )
+
+    multi_n = PythonVirtualenvOperator(
+            task_id='multi.n',
+            python_callable=common_get_data,
+            system_site_packages=False,
+            trigger_rule="all_done",
+            requirements=["git+https://github.com/baechu805/movie.git@0.3/api"],
+            op_kwargs={"ds_nodash": "{{ ds_nodash }}", "url_param": {"multiMovieYn": "N"}},
+            #op_args=["{{ ds_nodash }}"],
+            #op_kwargs={"url_param": {"multiMovieYn": "N"}}
+    )   
+
+    nation_k  = PythonVirtualenvOperator(
+            task_id='nation_k',
+            python_callable=common_get_data,
+            system_site_packages=False,
+            trigger_rule="all_done",
+            requirements=["git+https://github.com/baechu805/movie.git@0.3/api"],
+            op_kwargs={"ds_nodash": "{{ ds_nodash }}", "url_param": {"repNationCd": "k"}},
+            #op_args=["{{ ds_nodash }}"],
+            #op_kwargs={"url_param": {"repNationCd": "k"}}
+    )
+
+    nation_f  = PythonVirtualenvOperator(
+            task_id='nation_f',
+            python_callable=common_get_data,
+            system_site_packages=False,
+            trigger_rule="all_done",
+            requirements=["git+https://github.com/baechu805/movie.git@0.3/api"],
+            op_kwargs={"ds_nodash": "{{ ds_nodash }}", "url_param": {"repNationCd": "f"}},
+            #op_args=["{{ ds_nodash }}"],
+            #op_kwargs={"url_param": {"repNationCd": "F"}}
+    )
+
+
 
     rm_dir = BashOperator(
-        task_id= "rm.dir",
-        bash_command='rm -rf ~/tmp/test_parquet/load_dt={{ ds_nodash }}',
+            task_id= "rm.dir",
+            bash_command='rm -rf ~/tmp/test_parquet/load_dt={{ ds_nodash }}',
     
     )
 
@@ -119,10 +156,6 @@ with DAG(
             trigger_rule="all_done"
     )
 
-    multi_y = EmptyOperator(task_id='multi.y') # 다양성 영화 유무
-    multi_n = EmptyOperator(task_id='multi.n')
-    nation_k  = EmptyOperator(task_id='nation.k')
-    nation_f  = EmptyOperator(task_id='nation.f')
 
     end = EmptyOperator(task_id='end')
     start = EmptyOperator(task_id='start')
@@ -140,6 +173,6 @@ with DAG(
     branch_op >> get_start
     branch_op >> echo_task
     
-    get_start >> [get_data, multi_y, multi_n, nation_k, nation_f] >> get_end >> save_data >> end
+    get_start >> [multi_y, multi_n, nation_k, nation_f] >> get_end >> save_data >> end
 
     
