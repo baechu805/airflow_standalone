@@ -12,6 +12,9 @@ from airflow.operators.python import (
         PythonVirtualenvOperator,
         BranchPythonOperator
         )
+import pprint
+from pprint import pprint as pp
+
 
 with DAG(
     'movie_summary',
@@ -30,25 +33,64 @@ with DAG(
     catchup=True,
     tags=['movie', 'api', 'amt'],
 ) as dag:
+    REQUIREMENTS = ["git+https://github.com/baechu805/mov_agg.git@0.5/agg"]
+
+    def gen_empty(*ids):
+        tasks = []
+        for id in ids:
+            task = EmptyOperator(task_id=id)
+            tasks.append(task)
+        return tuple(tasks)
+
+    def gen_vpython(**kw):
+        task = PythonVirtualenvOperator(
+                task_id=kw['id'],
+                python_callable=kw['fun_obj'],
+                system_site_packages=False,
+                requirements=REQUIREMENTS,
+                op_kwargs=kw['op_kw']
+            )
+        return task
+
+    def pro_data(**params):
+        print("@" * 33)
+        print(params['task_name'])
+        print(params) # 여기는 task_name
+        print("@" * 33)
+
+    def pro_merge(task_name, **params):
+        load_dt = params['ds_nodash']
+        from mov_agg.u import merge
+        df = merge(load_dt)
+        print("*" * 33)
+        print(df)
+
+    start, end = gen_empty('start', 'end')
+
+    apply_type = gen_vpython(
+            id = 'apply.type',
+            fun_obj = pro_data,
+            op_kw = { "task_name": "apply_type!!!" }
+            )
+
+    merge_df = gen_vpython(
+            id = 'merge_df',
+            fun_obj = pro_data,
+            op_kw = { "task_name": "merge_df!!!" }
+            )
+    de_dup = gen_vpython(
+            id = 'de_dup',
+            fun_obj = pro_data,
+            op_kw = { "task_name": "de_dup!!!" }
+            )
+    summary_df = gen_vpython(
+            id = 'summary_df',
+            fun_obj = pro_data,
+            op_kw = { "task_name": "summary_df!!!" })
+
     
+    start >> merge_df
+    merge_df >> de_dup >> apply_type
+    apply_type >> summary_df >> end
 
-    apply_type = EmptyOperator(
-            task_id='apply_type',
-            trigger_rule="all_done"
-    )
 
-    merge_df = EmptyOperator(
-            task_id='merge_df',
-            trigger_rule="all_done"
-    )
-
-    de_dup = EmptyOperator(                                                                                        task_id='de_dup',                                                                                      trigger_rule="all_done"
-    )
-
-    summary_df = EmptyOperator(                                                                                        task_id='summary_df',                                                                                      trigger_rule="all_done"
-    )
-
-    end = EmptyOperator(task_id='end')
-    start = EmptyOperator(task_id='start')
-
-    start >> apply_type >> merge_df >> de_dup >> summary_df >> end
